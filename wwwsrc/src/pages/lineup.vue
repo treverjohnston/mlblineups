@@ -21,12 +21,14 @@
             <div class="col-xs-6">
                 <q-btn @click="getAllLineups">Get All Lineups</q-btn>
             </div>
+            <div class="col-xs-6">
+                <q-btn @click="getLineupPerc">Get Lineup Stuff</q-btn>
+            </div>
             <div class="col-xs-12">
                 <q-list v-if="hasContent">
-                    <div v-for="day in seasonLineups" >
-                        <q-collapsible icon="explore" :label="day.month +' '+ day.day">
-                            <!-- <q-collapsible v-for="day in seasonLineups" icon="explore" :label="day[1].month +' '+ day[1].day"> -->
-                                <div v-for="player in day.lineup" class="row justify-center">
+                    <div v-for="lineups in lineupsByCount" >
+                        <q-collapsible icon="explore" :label="lineups.pct + '%' + ' - ' + lineups.winCount.toString() +' for '+ lineups.count.toString()">
+                                <div v-if="player.shortPos != 'P'" v-for="player in lineups.lineup" class="row justify-center">
                                     <p class="col-xs-2">{{player.shortOrderPos}}</p>
                                     <p class="col-xs-9">{{player.fullName}}</p>
                                     <p class="col-xs-1">{{player.shortPos}}</p>
@@ -35,6 +37,19 @@
                         </div>
                 </q-list>
             </div>
+            <!-- <div class="col-xs-12">
+                <q-list v-if="hasContent">
+                    <div v-for="day in seasonLineups" >
+                        <q-collapsible icon="explore" :label="day.month +' '+ day.day">
+                                <div v-for="player in day.lineup" class="row justify-center">
+                                    <p class="col-xs-2">{{player.shortOrderPos}}</p>
+                                    <p class="col-xs-9">{{player.fullName}}</p>
+                                    <p class="col-xs-1">{{player.shortPos}}</p>
+                                </div>
+                            </q-collapsible>
+                        </div>
+                </q-list>
+            </div> -->
         </div>
     </q-layout>
 </template>
@@ -60,6 +75,9 @@
             },
             today() {
                 return this.$store.state.todayString
+            },
+            lineupsByCount(){
+                return this.$store.state.teamLineupPerc
             }
         },
         mounted() {
@@ -74,6 +92,9 @@
             },
             getAllLineups() {
                 this.$store.dispatch('getAllLineups', this.$route.params.id)
+            },
+            getLineupPerc() {
+                this.$store.commit('getLineupPercentage', this.$route.params.id)
             }
 
 

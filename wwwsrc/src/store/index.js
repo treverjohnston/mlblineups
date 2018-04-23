@@ -24,7 +24,8 @@ var store = new Vuex.Store({
     teams: {},
     seasonLineups: {},
     todayString: '',
-    hasContent: false
+    hasContent: false,
+    teamLineupPerc: []
   },
   mutations: {
 
@@ -55,11 +56,8 @@ var store = new Vuex.Store({
         if (!state.seasonLineups[obj.teamId]) {
           state.seasonLineups[obj.teamId] = {}
         }
-        //////////////////////
-        //////NEED TO FIGURE OUT HOW TO SET TO ARRAY FOR SORTING OR OTHER SORT METHOD
-        //////////////////////
-        Vue.set(state.seasonLineups[obj.teamId], obj.fullDate, { month: obj.fullDate.substring(0, 2), day: obj.fullDate.substring(2, 4), year: obj.fullDate.substring(4, 8), lineup: state.tempOrder })
-        console.log('arhol', state.seasonLineups)
+        Vue.set(state.seasonLineups[obj.teamId], obj.fullDate, { month: obj.fullDate.substring(0, 2), day: obj.fullDate.substring(2, 4), year: obj.fullDate.substring(4, 8), lineup: state.tempOrder, isWinner: obj.isWinner })
+        // console.log('arhol', state.seasonLineups)
 
         state.tempOrder = { 100: null }
         var today = new Date();
@@ -76,8 +74,8 @@ var store = new Vuex.Store({
         var megaDate = mm + dd + yyyy
 
         state.todaysOrder = state.seasonLineups[obj.teamId][megaDate].lineup
-        console.log('TODAY', state.todaysOrder)
-        console.log('SeASON LINEUPS', state.seasonLineups)
+        // console.log('TODAY', state.todaysOrder)
+        // console.log('SeASON LINEUPS', state.seasonLineups)
         state.hasContent = true
 
       }
@@ -90,23 +88,67 @@ var store = new Vuex.Store({
     clearLineup(state) {
       state.todaysOrder = []
     },
-    cleanUpOrder(state, obj) {
-      // obj = {
-      //   day: obj.day,
-      //   month: obj.month,
-      //   year: obj.year,
-      //   lineup: state.todaysOrder
-      // }
-      if (!state.seasonLineups[obj.teamId]) {
-        state.seasonLineups[obj.teamId] = {}
+    getLineupPercentage(state, teamId) {
+      var teamSeasonLineup = state.seasonLineups[teamId]
+      for (const day in teamSeasonLineup) {
+        if (teamSeasonLineup.hasOwnProperty(day)) {
+          const lineup = teamSeasonLineup[day];
+          var obj = { lineup: lineup.lineup, teamId: lineup.lineup[100].teamId, isWinner: lineup.isWinner }
+          this.commit('compareLineups', obj)
+        }
+      }
+      console.log(state.teamLineupPerc)
+    },
+    compareLineups(state, obj) {
+      // var teamSeasonLineup = state.seasonLineups[obj.teamId]
+      var containsLineup = false;
+      for (let i = 0; i < state.teamLineupPerc.length; i++) {
+        const percLineup = state.teamLineupPerc[i].lineup;
+        if (percLineup == null) {
+          continue;
+        }
+        var sameCount = 0
+        var samePos = {}
+        for (const player in obj.lineup) {
+          if (obj.lineup.hasOwnProperty(player)) {
+            const earth = obj.lineup[player];
+            for (const percPlayer in percLineup) {
+              if (percLineup.hasOwnProperty(percPlayer)) {
+                const wind = percLineup[percPlayer];
+                if (earth.id == wind.id && earth.orderPos == wind.orderPos) {
+                  sameCount++
+                  break;
+                }
+              }
+            }
+          }
+        }
+        if (sameCount >= 8) {
+          state.teamLineupPerc[i].count++
+          if (obj.isWinner) {
+            state.teamLineupPerc[i].winCount++
+          }
+          state.teamLineupPerc[i].dates.push(obj.lineup[100].fullDate)
+          state.teamLineupPerc[i].pct = Math.floor((state.teamLineupPerc[i].winCount/state.teamLineupPerc[i].count) * 100)
+          containsLineup = true;
+          break;
+        }
+      }
+      if (!containsLineup) {
+        var winCount = 0
+        if (obj.isWinner) {
+          winCount++
+        }
+        var tempObj = {
+          lineup: obj.lineup,
+          count: 1,
+          winCount: winCount,
+          dates: [obj.lineup[100].fullDate],
+          pct: Math.floor((winCount/1) * 100)
+        }
+        state.teamLineupPerc.push(tempObj)
       }
 
-      Vue.set(state.seasonLineups[obj.teamId], obj.fullDate, { day: obj.day, month: obj.month, year: obj.year, lineup: state.todaysOrder })
-      state.hasContent = true
-      // console.log('TEMP', state.tempOrder)
-      // state.todaysOrder = {}
-
-      // console.log(state.seasonLineups)
     }
   },
   actions: {
@@ -151,7 +193,8 @@ var store = new Vuex.Store({
                   gamePk: element.gamePk,
                   home: false,
                   teamId: chosenId,
-                  fullDate: mm + dd + yyyy
+                  fullDate: mm + dd + yyyy,
+                  isWinner: element.teams.away.isWinner
                 }
                 dispatch('getBattingOrder', tempObj)
               }
@@ -160,7 +203,8 @@ var store = new Vuex.Store({
                   gamePk: element.gamePk,
                   home: true,
                   teamId: chosenId,
-                  fullDate: mm + dd + yyyy
+                  fullDate: mm + dd + yyyy,
+                  isWinner: element.teams.home.isWinner
                 }
                 dispatch('getBattingOrder', tempObj)
               }
@@ -181,7 +225,7 @@ var store = new Vuex.Store({
                 const player = boxscore.data.teams.away.players[i];
                 if (player.battingOrder) {
 
-                  dispatch('getCurrentPos', { order: boxscore.data.teams.away.battingOrder, player: player, teamId: obj.teamId, fullDate: obj.fullDate })
+                  dispatch('getCurrentPos', { order: boxscore.data.teams.away.battingOrder, player: player, teamId: obj.teamId, fullDate: obj.fullDate, isWinner: obj.isWinner })
                 }
               }
             }
@@ -192,7 +236,7 @@ var store = new Vuex.Store({
               if (boxscore.data.teams.home.players.hasOwnProperty(i)) {
                 const player = boxscore.data.teams.home.players[i];
                 if (player.battingOrder) {
-                  dispatch('getCurrentPos', { order: boxscore.data.teams.home.battingOrder, player: player, teamId: obj.teamId, fullDate: obj.fullDate })
+                  dispatch('getCurrentPos', { order: boxscore.data.teams.home.battingOrder, player: player, teamId: obj.teamId, fullDate: obj.fullDate, isWinner: obj.isWinner })
                 }
               }
             }
@@ -215,7 +259,8 @@ var store = new Vuex.Store({
               fullName: obj.player.person.fullName,
               id: obj.player.person.id,
               teamId: obj.teamId,
-              fullDate: obj.fullDate
+              fullDate: obj.fullDate,
+              isWinner: obj.isWinner
             };
             break;
           }
@@ -265,7 +310,8 @@ var store = new Vuex.Store({
                     gamePk: element.gamePk,
                     home: false,
                     teamId: chosenId,
-                    fullDate: month + day + yyyy
+                    fullDate: month + day + yyyy,
+                    isWinner: element.teams.away.isWinner
                   }
                   // console.log('la;ksdjf', tempObj.fullDate)
 
@@ -276,7 +322,8 @@ var store = new Vuex.Store({
                     gamePk: element.gamePk,
                     home: true,
                     teamId: chosenId,
-                    fullDate: month + day + yyyy
+                    fullDate: month + day + yyyy,
+                    isWinner: element.teams.home.isWinner
                   }
                   dispatch('getBattingOrder', tempObj)
                 }
@@ -284,15 +331,6 @@ var store = new Vuex.Store({
 
             }
           })
-        var woops = {
-          fullDate: month + day + yyyy,
-          month: month,
-          day: day,
-          year: yyyy,
-          teamId: chosenId
-        }
-        // console.log('FULLDATE', woops.fullDate)
-        // commit('cleanUpOrder', woops)
       }
     },
 
