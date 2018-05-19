@@ -25,7 +25,8 @@ var store = new Vuex.Store({
     seasonLineups: {},
     todayString: '',
     hasContent: false,
-    teamLineupPerc: []
+    teamLineupPerc: [],
+    todaysLineupWins: {}
   },
   mutations: {
 
@@ -72,8 +73,12 @@ var store = new Vuex.Store({
           mm = '0' + mm;
         }
         var megaDate = mm + dd + yyyy
-
-        state.todaysOrder = state.seasonLineups[obj.teamId][megaDate].lineup
+        if (state.seasonLineups[obj.teamId][megaDate]) {
+          state.todaysOrder = state.seasonLineups[obj.teamId][megaDate].lineup
+        }
+        else {
+          state.todaysOrder = null
+        }
         // console.log('TODAY', state.todaysOrder)
         // console.log('SeASON LINEUPS', state.seasonLineups)
         state.hasContent = true
@@ -85,22 +90,33 @@ var store = new Vuex.Store({
     setTeams(state, team) {
       Vue.set(state.teams, team.id, team)
     },
-    clearLineup(state) {
+    clearTodayLineup(state) {
       state.todaysOrder = []
     },
+    clearTeamLineup(state) {
+      state.teamLineupPerc = []
+    },
     getLineupPercentage(state, teamId) {
+      this.commit('clearTeamLineup')
       var teamSeasonLineup = state.seasonLineups[teamId]
       for (const day in teamSeasonLineup) {
         if (teamSeasonLineup.hasOwnProperty(day)) {
           const lineup = teamSeasonLineup[day];
           var obj = { lineup: lineup.lineup, teamId: lineup.lineup[100].teamId, isWinner: lineup.isWinner }
           this.commit('compareLineups', obj)
+          this.commit('addToTodaysLineupWin', obj.lineup)
         }
       }
-      console.log(state.teamLineupPerc)
+      state.teamLineupPerc.sort(function (a, b) {
+        return b.count - a.count;
+        // return b.pct - a.pct;
+      });
+      // console.log(state.teamLineupPerc)
     },
     compareLineups(state, obj) {
-      // var teamSeasonLineup = state.seasonLineups[obj.teamId]
+      /////////////////////////////////////
+      ////////IFISTODAY DONT COUNT ISWINNER
+      /////////////////////////////////////
       var containsLineup = false;
       for (let i = 0; i < state.teamLineupPerc.length; i++) {
         const percLineup = state.teamLineupPerc[i].lineup;
@@ -115,7 +131,10 @@ var store = new Vuex.Store({
             for (const percPlayer in percLineup) {
               if (percLineup.hasOwnProperty(percPlayer)) {
                 const wind = percLineup[percPlayer];
-                if (earth.id == wind.id && earth.orderPos == wind.orderPos) {
+                var check1 = earth.orderPos == wind.orderPos
+                var check2 = earth.id == wind.id
+                var check3 = earth.shortPos == 'P' && wind.shortPos == 'P'
+                if (check1 && (check2 || check3)) {
                   sameCount++
                   break;
                 }
@@ -123,13 +142,23 @@ var store = new Vuex.Store({
             }
           }
         }
-        if (sameCount >= 8) {
+        if (sameCount >= 9) {
+          /////////////////////
+          //////////DO THE TODAYCHECK HERE
+          ////////////////////////////
           state.teamLineupPerc[i].count++
           if (obj.isWinner) {
             state.teamLineupPerc[i].winCount++
           }
+          var pct = (state.teamLineupPerc[i].winCount / state.teamLineupPerc[i].count).toFixed(3)
+          if (pct.includes('.')) {
+           pct = pct.substring(pct.indexOf('.'))
+          }
+          else{
+            pct = '.'+pct+'00'
+          }
           state.teamLineupPerc[i].dates.push(obj.lineup[100].fullDate)
-          state.teamLineupPerc[i].pct = Math.floor((state.teamLineupPerc[i].winCount/state.teamLineupPerc[i].count) * 100)
+          state.teamLineupPerc[i].pct = pct
           containsLineup = true;
           break;
         }
@@ -144,12 +173,53 @@ var store = new Vuex.Store({
           count: 1,
           winCount: winCount,
           dates: [obj.lineup[100].fullDate],
-          pct: Math.floor((winCount/1) * 100)
+          pct: (winCount / 1)
         }
         state.teamLineupPerc.push(tempObj)
       }
 
+    },
+    addToTodaysLineupWin(state, lineup) {
+      for (const element in lineup) {
+        if (lineup.hasOwnProperty(element)) {
+          const player = lineup[element];
+          ///////ISSUES HERE
+          if (state.todaysLineupWins[player.id] && state.todaysLineupWins[player.id][player.shortOrderPos]) {
+            var place = state.todaysLineupWins[player.id][player.shortOrderPos]
+            var pct = 0;
+            if (player.isWinner) {
+              Vue.set(state.todaysLineupWins[player.id], [player.shortOrderPos].winCount, place.winCount++)
+            }
+            if (state.todaysLineupWins[player.id][player.shortOrderPos] == 1) {
+              continue;
+            }
+            if (place.winCount - place.count != 0) {
+              pct = place.winCount/place.count 
+            }
+            Vue.set(state.todaysLineupWins[player.id], [player.shortOrderPos].pct, pct)
+            Vue.set(state.todaysLineupWins[player.id], [player.shortOrderPos].count, place.count++)
+          } else if (state.todaysLineupWins[player.id]) {
+            state.todaysLineupWins[player.id][player.shortOrderPos] = {}
+            if (player.isWinner) {
+              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 1, count: 1, pct: "1.000" })
+            } else {
+              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 0, count: 1, pct: ".000" })
+            }
+          } else {
+            state.todaysLineupWins[player.id] = {}
+            if (player.isWinner) {
+              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 1, count: 1, pct: '1.000' })
+            } else {
+              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 0, count: 1, pct: '.000' })
+            }
+          }
+
+        }
+      }
+
+
     }
+
   },
   actions: {
     /////////
