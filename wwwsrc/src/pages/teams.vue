@@ -30,7 +30,7 @@
                     openURL(url)
                 },
                 getGames(id){
-                    this.$store.dispatch('getGames', id)
+                    // this.$store.dispatch('getGames', id)
                     this.$router.push(`/teams/${id}`)
                 }
     
