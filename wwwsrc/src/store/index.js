@@ -26,7 +26,7 @@ var store = new Vuex.Store({
     todayString: '',
     hasContent: false,
     teamLineupPerc: [],
-    todaysLineupWins: {},
+    todaysLineupWithPct: {},
     teamPlayers: {},
     fullSeason: false,
     battingOrderHolderFull: false,
@@ -95,14 +95,9 @@ var store = new Vuex.Store({
       var dd = playerObj.fullDate.substring(2, 4);
       var yyyy = playerObj.fullDate.substring(4, 8);
 
-      var monthDayString = mm + dd + yyyy
-      if (state.seasonLineups[teamId][monthDayString]) {
-        state.todaysOrder = state.seasonLineups[teamId][monthDayString].lineup;
-      }
-      else {
-        //I think this was supposed to be here so that the front end knows that todays lineup isn't posted yet.. but I'm pretty sure it won't ever get here if thats the case
-        debugger
-        state.todaysOrder = null;
+      var monthDayYearString = mm + dd + yyyy
+      if (state.todayString == monthDayYearString && state.seasonLineups[teamId][monthDayYearString]) {
+        state.todaysOrder = state.seasonLineups[teamId][monthDayYearString].lineup;
       }
 
       this.commit('addToTeamPlayers')
@@ -124,19 +119,6 @@ var store = new Vuex.Store({
       state.teamLineupPerc = []
     },
 
-    setPlayerWinPercentages(state, teamId) {
-      this.commit('clearTeamLineup')
-      var teamSeasonLineup = state.seasonLineups[teamId]
-
-      for (const day in teamSeasonLineup) {
-        if (teamSeasonLineup.hasOwnProperty(day)) {
-          const singleDayLineup = teamSeasonLineup[day];
-          var lineup = { lineup: singleDayLineup.lineup, teamId: singleDayLineup.lineup[100].teamId, isWinner: singleDayLineup.isWinner }
-
-        }
-      }
-    },
-
     getLineupPercentage(state, teamId) {
       this.commit('clearTeamLineup')
       var singleTeamSeason = state.seasonLineups[teamId]
@@ -147,8 +129,7 @@ var store = new Vuex.Store({
 
           //TODO: GET THIS BETTER DONE
           //FOR NOW, FOCUSING ON GETTING WIN COUNT/PERCENTAGES TO BE ACCURATE
-          this.commit('compareLineups', gameObj)
-
+          // this.commit('compareLineups', gameObj)
           this.commit('addToTodaysLineupWin', gameObj.lineup)
         }
       }
@@ -228,41 +209,78 @@ var store = new Vuex.Store({
     },
     addToTodaysLineupWin(state, lineup) {
       for (const element in lineup) {
-        if (lineup.hasOwnProperty(element)) {
-          const player = lineup[element];
-          state.fullSeason = true;
-          ///////ISSUES HERE
-          if (state.todaysLineupWins[player.id] && state.todaysLineupWins[player.id][player.shortOrderPos]) {
-            var place = state.todaysLineupWins[player.id][player.shortOrderPos]
+        const player = lineup[element];
+        var lineupAtPlayerId = state.todaysLineupWithPct[player.id];
+        var lineupPos = player.shortOrderPos;
+        state.fullSeason = true;
+        ///////ISSUES HERE
+
+        //I seem to have done somehting in the code below that is super slowing it down.. maybe created an infinite loop or somehting?
+
+        //Different track for PCT depending on if the date is today or not -- eventually need to update to check if game is done or not
+        if (player.fullDate != state.todayString) {
+          //Checks to see games that player was at that lineup spot
+          if (lineupAtPlayerId && lineupAtPlayerId[lineupPos]) {
+            var currentPlayerState = lineupAtPlayerId[lineupPos]
             var pct = 0;
             if (player.isWinner) {
-              Vue.set(state.todaysLineupWins[player.id], [player.shortOrderPos].winCount, place.winCount++)
+              Vue.set(lineupAtPlayerId, [lineupPos].winCount, currentPlayerState.winCount++)
             }
-            if (state.todaysLineupWins[player.id][player.shortOrderPos] == 1) {
+            if (lineupAtPlayerId[lineupPos] == 1) {
               continue;
             }
-            if (place.winCount - place.count != 0) {
-              pct = place.winCount / place.count
+            if (currentPlayerState.winCount - currentPlayerState.count != 0) {
+              pct = currentPlayerState.winCount / currentPlayerState.count
             }
-            Vue.set(state.todaysLineupWins[player.id], [player.shortOrderPos].pct, pct)
-            Vue.set(state.todaysLineupWins[player.id], [player.shortOrderPos].count, place.count++)
-          } else if (state.todaysLineupWins[player.id]) {
-            state.todaysLineupWins[player.id][player.shortOrderPos] = {}
-            if (player.isWinner) {
-              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 1, count: 1, pct: "1.000" })
-            } else {
-              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 0, count: 1, pct: ".000" })
-            }
-          } else {
-            state.todaysLineupWins[player.id] = {}
-            if (player.isWinner) {
-              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 1, count: 1, pct: '1.000' })
-            } else {
-              Vue.set(state.todaysLineupWins[player.id], player.shortOrderPos, { player: player, winCount: 0, count: 1, pct: '.000' })
-            }
+            Vue.set(lineupAtPlayerId, [lineupPos].pct, pct)
+            Vue.set(lineupAtPlayerId, [lineupPos].count, currentPlayerState.count++)
           }
 
+          //Checks to see games that player is in object
+          else if (lineupAtPlayerId) {
+            lineupAtPlayerId[lineupPos] = {}
+            if (player.isWinner) {
+              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 1, count: 1, pct: "1.000" })
+            } else {
+              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 1, pct: ".000" })
+            }
+          }
+          else {
+            lineupAtPlayerId = {}
+            if (player.isWinner) {
+              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 1, count: 1, pct: '1.000' })
+            } else {
+              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 1, pct: '.000' })
+            }
+          }
         }
+        else {
+          if (lineupAtPlayerId && lineupAtPlayerId[lineupPos]) {
+            var currentPlayerState = lineupAtPlayerId[lineupPos]
+            var pct = 0;
+            if (lineupAtPlayerId[lineupPos] == 1) {
+              continue;
+            }
+            if (currentPlayerState.winCount - currentPlayerState.count != 0) {
+              pct = currentPlayerState.winCount / currentPlayerState.count
+            }
+            Vue.set(lineupAtPlayerId, [lineupPos].pct, pct)
+            Vue.set(lineupAtPlayerId, [lineupPos].count, currentPlayerState.count)
+          }
+
+          //Checks to see games that player is in object
+          else if (lineupAtPlayerId) {
+            lineupAtPlayerId[lineupPos] = {}
+
+            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 0, pct: "NA" })
+
+          }
+          else {
+            lineupAtPlayerId = {}
+            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 0, pct: 'NA' })
+          }
+        }
+
       }
     },
 

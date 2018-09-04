@@ -46,7 +46,7 @@
             </div>
             <div v-if="!fullSeason" class="col-xs-12 text-center">
                 <q-btn @click="getLineupPerc">See Lineup Percentages</q-btn>
-                <q-btn @click="getAllLineups">Get All Lineups</q-btn>
+                <!-- <q-btn @click="getAllLineups">Get All Lineups</q-btn> -->
             </div>
             <!-- <div class="col-xs-12">
                 <q-list v-if="hasContent">
@@ -114,7 +114,7 @@
                 return this.$store.state.todaysOrder
             },
             orderWithPct() {
-                return this.$store.state.todaysLineupWins
+                return this.$store.state.todaysLineupWithPct
             },
             today() {
                 return this.$store.state.todayString
@@ -122,9 +122,9 @@
             lineupsByCount() {
                 return this.$store.state.teamLineupPerc
             },
-            // players() {
-            //     return this.$store.state.teamPlayers
-            // }
+            players() {
+                return this.$store.state.teamPlayers
+            }
         },
         mounted() {
             this.$store.commit('setTodayString')
@@ -132,7 +132,7 @@
             this.$store.commit('clearTodayLineup')
             // this.$store.dispatch('getTeams')
             this.$store.dispatch('getGames', this.$route.params.id)
-            // this.$store.dispatch('getAllLineups', this.$route.params.id)
+            this.$store.dispatch('getAllLineups', this.$route.params.id)
 
 
             // setTimeout(() => {
