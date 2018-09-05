@@ -209,75 +209,69 @@ var store = new Vuex.Store({
     },
     addToTodaysLineupWin(state, lineup) {
       for (const element in lineup) {
+        var gameIsToday = false;
         const player = lineup[element];
         var lineupAtPlayerId = state.todaysLineupWithPct[player.id];
         var lineupPos = player.shortOrderPos;
         state.fullSeason = true;
-        ///////ISSUES HERE
+        ////////TODO///////////////////////
+        //Need to figure out a way to make sure that all games and players have been added to seasonLineups -- otherwise stats come back incomplete
+        ////////////////////////////////////////////
 
-        //I seem to have done somehting in the code below that is super slowing it down.. maybe created an infinite loop or somehting?
 
-        //Different track for PCT depending on if the date is today or not -- eventually need to update to check if game is done or not
-        if (player.fullDate != state.todayString) {
-          //Checks to see games that player was at that lineup spot
-          if (lineupAtPlayerId && lineupAtPlayerId[lineupPos]) {
-            var currentPlayerState = lineupAtPlayerId[lineupPos]
-            var pct = 0;
-            if (player.isWinner) {
-              Vue.set(lineupAtPlayerId, [lineupPos].winCount, currentPlayerState.winCount++)
-            }
-            if (lineupAtPlayerId[lineupPos] == 1) {
-              continue;
-            }
-            if (currentPlayerState.winCount - currentPlayerState.count != 0) {
-              pct = currentPlayerState.winCount / currentPlayerState.count
-            }
-            Vue.set(lineupAtPlayerId, [lineupPos].pct, pct)
+        //Different track for .PCT depending on if the date is today or not -- eventually need to update to check if game is done or not
+        if (player.fullDate == state.todayString) {
+          gameIsToday = true;
+        }
+
+        if (state.todaysOrder[player.orderPos].fullName != player.fullName) {
+          continue;
+        }
+
+        //Checks to see games that player was at that lineup spot
+        if (lineupAtPlayerId && lineupAtPlayerId[lineupPos]) {
+          if (lineupAtPlayerId[lineupPos] == 1) {
+            continue;
+          }
+          var currentPlayerState = lineupAtPlayerId[lineupPos]
+          if (player.isWinner && !gameIsToday) {
+            Vue.set(lineupAtPlayerId, [lineupPos].winCount, currentPlayerState.winCount++)
+          }
+          if (!gameIsToday) {
             Vue.set(lineupAtPlayerId, [lineupPos].count, currentPlayerState.count++)
           }
+          var pct = 0;
 
-          //Checks to see games that player is in object
-          else if (lineupAtPlayerId) {
-            lineupAtPlayerId[lineupPos] = {}
-            if (player.isWinner) {
-              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 1, count: 1, pct: "1.000" })
-            } else {
-              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 1, pct: ".000" })
-            }
+          if (currentPlayerState.winCount - currentPlayerState.count != 0) {
+            pct = (currentPlayerState.winCount / currentPlayerState.count).toFixed(3);
+            pct = pct.substring(pct.indexOf("."));
           }
           else {
-            lineupAtPlayerId = {}
-            if (player.isWinner) {
-              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 1, count: 1, pct: '1.000' })
-            } else {
-              Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 1, pct: '.000' })
-            }
+            pct = "1.000";
+          }
+          lineupAtPlayerId[lineupPos].pct = pct;
+        }
+
+        //Checks to see games that player is in object
+        else if (lineupAtPlayerId) {
+          lineupAtPlayerId[lineupPos] = {}
+          if (player.isWinner) {
+            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 1, count: 1, pct: "1.000" })
+          } else if (gameIsToday) {
+            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 0, pct: '.000' })
+          } else {
+            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 1, pct: '.000' })
           }
         }
+
         else {
-          if (lineupAtPlayerId && lineupAtPlayerId[lineupPos]) {
-            var currentPlayerState = lineupAtPlayerId[lineupPos]
-            var pct = 0;
-            if (lineupAtPlayerId[lineupPos] == 1) {
-              continue;
-            }
-            if (currentPlayerState.winCount - currentPlayerState.count != 0) {
-              pct = currentPlayerState.winCount / currentPlayerState.count
-            }
-            Vue.set(lineupAtPlayerId, [lineupPos].pct, pct)
-            Vue.set(lineupAtPlayerId, [lineupPos].count, currentPlayerState.count)
-          }
-
-          //Checks to see games that player is in object
-          else if (lineupAtPlayerId) {
-            lineupAtPlayerId[lineupPos] = {}
-
-            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 0, pct: "NA" })
-
-          }
-          else {
-            lineupAtPlayerId = {}
-            Vue.set(lineupAtPlayerId, lineupPos, { player: player, winCount: 0, count: 0, pct: 'NA' })
+          state.todaysLineupWithPct[player.id] = {}
+          if (player.isWinner) {
+            Vue.set(state.todaysLineupWithPct[player.id], lineupPos, { player: player, winCount: 1, count: 1, pct: '1.000' })
+          } else if (gameIsToday) {
+            Vue.set(state.todaysLineupWithPct[player.id], lineupPos, { player: player, winCount: 0, count: 0, pct: '.000' })
+          } else {
+            Vue.set(state.todaysLineupWithPct[player.id], lineupPos, { player: player, winCount: 0, count: 1, pct: '.000' })
           }
         }
 
